@@ -12,21 +12,17 @@ fn bench_encoder_creation(c: &mut Criterion) {
 
 fn bench_tile_pyramid_creation(c: &mut Criterion) {
     let image = image::DynamicImage::new_rgba8(512, 512);
-    
+
     c.bench_function("tile_pyramid_creation", |b| {
         b.iter(|| {
             black_box(tiles::TilePyramid::new(
                 black_box(image.clone()),
                 black_box(256),
-                black_box(5)
+                black_box(5),
             ))
         })
     });
 }
 
-criterion_group!(
-    benches,
-    bench_encoder_creation,
-    bench_tile_pyramid_creation
-);
+criterion_group!(benches, bench_encoder_creation, bench_tile_pyramid_creation);
 criterion_main!(benches);

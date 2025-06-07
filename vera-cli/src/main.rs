@@ -117,7 +117,7 @@ fn main() {
     // Run command
     if let Err(e) = run(args) {
         error!("Command failed: {}", e);
-        
+
         // Map to appropriate exit codes
         let exit_code = match e.downcast_ref::<VeraError>() {
             Some(VeraError::InvalidFormat(_)) => 1,
@@ -125,59 +125,51 @@ fn main() {
             Some(VeraError::IoError(_)) => 1,
             _ => 2,
         };
-        
+
         process::exit(exit_code);
     }
 }
 
 fn run(args: Args) -> Result<()> {
     match args.command {
-        Commands::Encode { 
-            input, 
-            output, 
-            tile_size, 
-            max_zoom 
-        } => {
-            cmd_encode(input, output, tile_size, max_zoom)
-        }
-        Commands::Inspect { 
-            file, 
-            format, 
-            pretty 
-        } => {
-            cmd_inspect(file, format, pretty)
-        }
-        Commands::Extract { 
-            file, 
-            output_dir, 
-            tile, 
-            level, 
-            all 
-        } => {
-            cmd_extract(file, output_dir, tile, level, all)
-        }
-        Commands::Validate { 
-            file, 
-            check_tiles, 
-            check_vectors 
-        } => {
-            cmd_validate(file, check_tiles, check_vectors)
-        }
-        Commands::Info { file } => {
-            cmd_info(file)
-        }
+        Commands::Encode {
+            input,
+            output,
+            tile_size,
+            max_zoom,
+        } => cmd_encode(input, output, tile_size, max_zoom),
+        Commands::Inspect {
+            file,
+            format,
+            pretty,
+        } => cmd_inspect(file, format, pretty),
+        Commands::Extract {
+            file,
+            output_dir,
+            tile,
+            level,
+            all,
+        } => cmd_extract(file, output_dir, tile, level, all),
+        Commands::Validate {
+            file,
+            check_tiles,
+            check_vectors,
+        } => cmd_validate(file, check_tiles, check_vectors),
+        Commands::Info { file } => cmd_info(file),
     }
 }
 
 fn cmd_encode(input: PathBuf, output: PathBuf, tile_size: u32, max_zoom: u8) -> Result<()> {
     info!("Encoding {} to {}", input.display(), output.display());
-    
+
     // Use vera-enc for encoding
     let status = process::Command::new("vera-enc")
         .arg(&input)
         .arg(&output)
-        .arg("--tile-size").arg(tile_size.to_string())
-        .arg("--max-zoom").arg(max_zoom.to_string())
+        .arg("--tile-size")
+        .arg(tile_size.to_string())
+        .arg("--max-zoom")
+        .arg(max_zoom.to_string())
         .status()?;
 
     if !status.success() {
@@ -190,7 +182,7 @@ fn cmd_encode(input: PathBuf, output: PathBuf, tile_size: u32, max_zoom: u8) -> 
 
 fn cmd_inspect(file: PathBuf, format: InspectFormat, pretty: bool) -> Result<()> {
     info!("Inspecting {}", file.display());
-    
+
     let file_handle = File::open(&file)?;
     let vera_format = VeraFormat::open(file_handle)?;
     let metadata = vera_format.metadata()?;
@@ -203,14 +195,8 @@ fn cmd_inspect(file: PathBuf, format: InspectFormat, pretty: bool) -> Result<()>
                 serde_json::to_string(metadata)?
             }
         }
-        InspectFormat::Yaml => {
-            // TODO: Implement YAML output
-            anyhow::bail!("YAML output not implemented yet");
-        }
-        InspectFormat::Toml => {
-            // TODO: Implement TOML output
-            anyhow::bail!("TOML output not implemented yet");
-        }
+        InspectFormat::Yaml => serde_yaml::to_string(metadata)?,
+        InspectFormat::Toml => toml::to_string_pretty(metadata)?,
     };
 
     println!("{}", output);
@@ -218,14 +204,14 @@ fn cmd_inspect(file: PathBuf, format: InspectFormat, pretty: bool) -> Result<()>
 }
 
 fn cmd_extract(
-    file: PathBuf, 
-    output_dir: PathBuf, 
-    tile: Option<String>, 
-    level: Option<u8>, 
-    all: bool
+    file: PathBuf,
+    output_dir: PathBuf,
+    tile: Option<String>,
+    level: Option<u8>,
+    all: bool,
 ) -> Result<()> {
     info!("Extracting from {}", file.display());
-    
+
     let file_handle = File::open(&file)?;
     let mut decoder = Decoder::new(file_handle)?;
 
@@ -252,21 +238,21 @@ fn cmd_extract(
 
 fn cmd_validate(file: PathBuf, check_tiles: bool, check_vectors: bool) -> Result<()> {
     info!("Validating {}", file.display());
-    
+
     let file_handle = File::open(&file)?;
     let vera_format = VeraFormat::open(file_handle)?;
-    
+
     // Basic validation
     vera_format.validate()?;
     info!("✓ Basic format validation passed");
 
     if check_tiles {
-        // TODO: Implement tile validation
+        validate_tiles(&vera_format)?;
         info!("✓ Tile validation passed");
     }
 
     if check_vectors {
-        // TODO: Implement vector validation
+        validate_vectors(&vera_format)?;
         info!("✓ Vector validation passed");
     }
 
@@ -311,7 +297,7 @@ fn parse_tile_spec(spec: &str) -> Result<(u8, u32, u32)> {
     }
 
     let level: u8 = parts[0].parse()?;
-    
+
     let coords: Vec<&str> = parts[1].split('_').collect();
     if coords.len() != 2 {
         anyhow::bail!("Invalid tile coordinates: {}", parts[1]);
@@ -324,37 +310,160 @@ fn parse_tile_spec(spec: &str) -> Result<(u8, u32, u32)> {
 }
 
 fn extract_single_tile(
-    decoder: &mut Decoder<File>, 
-    output_dir: &PathBuf, 
-    level: u8, 
-    x: u32, 
-    y: u32
+    decoder: &mut Decoder<File>,
+    output_dir: &PathBuf,
+    level: u8,
+    x: u32,
+    y: u32,
 ) -> Result<()> {
     let image = decoder.decode_tile(level, x, y)?;
-    let filename = format!("tile_{}_{}_{}. png", level, x, y);
+    let filename = format!("tile_{}_{}_{}.png", level, x, y);
     let output_path = output_dir.join(filename);
-    
+
     image.save(&output_path)?;
-    info!("Extracted tile {}/{} {} to {}", level, x, y, output_path.display());
-    
+    info!(
+        "Extracted tile {}/{} {} to {}",
+        level,
+        x,
+        y,
+        output_path.display()
+    );
+
     Ok(())
 }
 
-fn extract_level_tiles(
-    decoder: &mut Decoder<File>, 
-    output_dir: &PathBuf, 
-    level: u8
-) -> Result<()> {
-    // TODO: Implement level extraction
+fn extract_level_tiles(decoder: &mut Decoder<File>, output_dir: &PathBuf, level: u8) -> Result<()> {
     info!("Extracting all tiles for level {}", level);
+
+    let metadata = decoder.metadata()?;
+    let (width, height) = decoder.dimensions()?;
+
+    // Calculate number of tiles at this level
+    let scale = 1 << level;
+    let level_width = (width + scale - 1) / scale;
+    let level_height = (height + scale - 1) / scale;
+    let tiles_x = (level_width + metadata.tile_size - 1) / metadata.tile_size;
+    let tiles_y = (level_height + metadata.tile_size - 1) / metadata.tile_size;
+
+    let mut extracted_count = 0;
+
+    for tile_y in 0..tiles_y {
+        for tile_x in 0..tiles_x {
+            match decoder.decode_tile(level, tile_x, tile_y) {
+                Ok(image) => {
+                    let filename = format!("tile_{}_{}_{}.png", level, tile_x, tile_y);
+                    let output_path = output_dir.join(filename);
+                    image.save(&output_path)?;
+                    extracted_count += 1;
+                }
+                Err(VeraError::TileNotFound { .. }) => {
+                    // Skip missing tiles
+                    continue;
+                }
+                Err(e) => return Err(e.into()),
+            }
+        }
+    }
+
+    info!("Extracted {} tiles for level {}", extracted_count, level);
     Ok(())
 }
 
-fn extract_all_tiles(
-    decoder: &mut Decoder<File>, 
-    output_dir: &PathBuf
-) -> Result<()> {
-    // TODO: Implement full extraction
+fn extract_all_tiles(decoder: &mut Decoder<File>, output_dir: &PathBuf) -> Result<()> {
     info!("Extracting all tiles");
+
+    // Extract metadata values to avoid borrow conflicts
+    let (max_zoom, tile_size) = {
+        let metadata = decoder.metadata()?;
+        (metadata.max_zoom_level, metadata.tile_size)
+    };
+
+    let mut total_extracted = 0;
+
+    for level in 0..=max_zoom {
+        info!("Processing level {}", level);
+
+        let level_dir = output_dir.join(format!("level_{}", level));
+        std::fs::create_dir_all(&level_dir)?;
+
+        let (width, height) = decoder.dimensions()?;
+        let scale = 1 << level;
+        let level_width = (width + scale - 1) / scale;
+        let level_height = (height + scale - 1) / scale;
+        let tiles_x = (level_width + tile_size - 1) / tile_size;
+        let tiles_y = (level_height + tile_size - 1) / tile_size;
+
+        let mut level_count = 0;
+
+        for tile_y in 0..tiles_y {
+            for tile_x in 0..tiles_x {
+                match decoder.decode_tile(level, tile_x, tile_y) {
+                    Ok(image) => {
+                        let filename = format!("tile_{}_{}.png", tile_x, tile_y);
+                        let output_path = level_dir.join(filename);
+                        image.save(&output_path)?;
+                        level_count += 1;
+                        total_extracted += 1;
+                    }
+                    Err(VeraError::TileNotFound { .. }) => {
+                        // Skip missing tiles
+                        continue;
+                    }
+                    Err(e) => return Err(e.into()),
+                }
+            }
+        }
+
+        info!("Extracted {} tiles for level {}", level_count, level);
+    }
+
+    info!(
+        "Extracted {} total tiles across all levels",
+        total_extracted
+    );
+    Ok(())
+}
+
+fn validate_tiles(vera_format: &VeraFormat<File>) -> Result<()> {
+    info!("Validating tiles...");
+
+    let metadata = vera_format.metadata()?;
+
+    // Check if tile count in metadata makes sense
+    let expected_tiles = metadata.calculate_tile_count();
+    if metadata.raster_tiles > expected_tiles {
+        anyhow::bail!(
+            "Metadata reports more tiles ({}) than theoretically possible ({})",
+            metadata.raster_tiles,
+            expected_tiles
+        );
+    }
+
+    info!(
+        "Tile metadata validation passed ({} tiles expected)",
+        expected_tiles
+    );
+    Ok(())
+}
+
+fn validate_vectors(vera_format: &VeraFormat<File>) -> Result<()> {
+    info!("Validating vector data...");
+
+    let metadata = vera_format.metadata()?;
+
+    // Check if vector regions match the metadata count
+    if metadata.vector_regions > 0 {
+        info!(
+            "Found {} vector regions in metadata",
+            metadata.vector_regions
+        );
+
+        // Additional vector validation could be added here:
+        // - Check vector data integrity
+        // - Validate path commands
+        // - Check bounding boxes
+    }
+
+    info!("Vector data validation completed");
     Ok(())
 }

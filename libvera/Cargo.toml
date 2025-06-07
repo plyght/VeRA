@@ -30,6 +30,10 @@ lyon.workspace = true
 cbor4ii.workspace = true
 flate2.workspace = true
 crc32fast.workspace = true
+webp.workspace = true
+ravif.workspace = true
+avif-parse.workspace = true
+lz4.workspace = true
 
 # Graphics rendering
 wgpu = { workspace = true, optional = true }

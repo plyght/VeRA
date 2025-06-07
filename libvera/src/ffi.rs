@@ -1,10 +1,26 @@
 //! C FFI bindings for libvera
 
+use std::cell::RefCell;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_uint};
 use std::ptr;
 
-use crate::{Decoder, VeraError, Result};
+use crate::{Decoder, Result, VeraError};
+
+thread_local! {
+    static LAST_ERROR: RefCell<Option<CString>> = RefCell::new(None);
+}
+
+fn set_last_error(error: &VeraError) {
+    let error_message = match CString::new(format!("{}", error)) {
+        Ok(msg) => msg,
+        Err(_) => CString::new("Failed to format error message").unwrap(),
+    };
+
+    LAST_ERROR.with(|e| {
+        *e.borrow_mut() = Some(error_message);
+    });
+}
 
 /// Error codes for FFI
 #[repr(C)]
@@ -68,12 +84,19 @@ pub extern "C" fn vera_decoder_open(path: *const c_char) -> *mut VeraDecoder {
 
     let file = match std::fs::File::open(path_str) {
         Ok(f) => f,
-        Err(_) => return ptr::null_mut(),
+        Err(e) => {
+            let vera_error = VeraError::IoError(e.to_string());
+            set_last_error(&vera_error);
+            return ptr::null_mut();
+        }
     };
 
     let decoder = match Decoder::new(file) {
         Ok(d) => d,
-        Err(_) => return ptr::null_mut(),
+        Err(e) => {
+            set_last_error(&e);
+            return ptr::null_mut();
+        }
     };
 
     Box::into_raw(Box::new(decoder)) as *mut VeraDecoder
@@ -91,7 +114,7 @@ pub extern "C" fn vera_decoder_dimensions(
     }
 
     let decoder = unsafe { &mut *(decoder as *mut Decoder<std::fs::File>) };
-    
+
     match decoder.dimensions() {
         Ok((w, h)) => {
             unsafe {
@@ -100,7 +123,10 @@ pub extern "C" fn vera_decoder_dimensions(
             }
             VeraErrorCode::Success
         }
-        Err(ref e) => e.into(),
+        Err(ref e) => {
+            set_last_error(e);
+            e.into()
+        }
     }
 }
 
@@ -119,23 +145,26 @@ pub extern "C" fn vera_decoder_decode_tile(
     }
 
     let decoder = unsafe { &mut *(decoder as *mut Decoder<std::fs::File>) };
-    
+
     match decoder.decode_tile(level, x, y) {
         Ok(image) => {
             let pixels = image.as_raw();
             let required_size = pixels.len();
-            
+
             if output_size < required_size as c_uint {
                 return VeraErrorCode::UnknownError;
             }
-            
+
             unsafe {
                 ptr::copy_nonoverlapping(pixels.as_ptr(), output, required_size);
             }
-            
+
             VeraErrorCode::Success
         }
-        Err(ref e) => e.into(),
+        Err(ref e) => {
+            set_last_error(e);
+            e.into()
+        }
     }
 }
 
@@ -152,6 +181,8 @@ pub extern "C" fn vera_decoder_free(decoder: *mut VeraDecoder) {
 /// Get last error message
 #[no_mangle]
 pub extern "C" fn vera_get_error_message() -> *const c_char {
-    // TODO: Implement thread-local error storage
-    b"Error message not available\0".as_ptr() as *const c_char
+    LAST_ERROR.with(|e| match e.borrow().as_ref() {
+        Some(error_string) => error_string.as_ptr(),
+        None => b"No error information available\0".as_ptr() as *const c_char,
+    })
 }

@@ -21,10 +21,28 @@ pub struct VectorPath {
 /// Path command types
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PathCommand {
-    MoveTo { x: f32, y: f32 },
-    LineTo { x: f32, y: f32 },
-    QuadraticTo { x1: f32, y1: f32, x: f32, y: f32 },
-    CubicTo { x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32 },
+    MoveTo {
+        x: f32,
+        y: f32,
+    },
+    LineTo {
+        x: f32,
+        y: f32,
+    },
+    QuadraticTo {
+        x1: f32,
+        y1: f32,
+        x: f32,
+        y: f32,
+    },
+    CubicTo {
+        x1: f32,
+        y1: f32,
+        x2: f32,
+        y2: f32,
+        x: f32,
+        y: f32,
+    },
     Close,
 }
 
@@ -122,10 +140,12 @@ impl VectorData {
             let new_x = self.bounds.x.min(layer.bounds.x);
             let new_y = self.bounds.y.min(layer.bounds.y);
             let new_width = (self.bounds.x + self.bounds.width)
-                .max(layer.bounds.x + layer.bounds.width) - new_x;
+                .max(layer.bounds.x + layer.bounds.width)
+                - new_x;
             let new_height = (self.bounds.y + self.bounds.height)
-                .max(layer.bounds.y + layer.bounds.height) - new_y;
-            
+                .max(layer.bounds.y + layer.bounds.height)
+                - new_y;
+
             self.bounds = BoundingBox {
                 x: new_x,
                 y: new_y,
@@ -133,7 +153,7 @@ impl VectorData {
                 height: new_height,
             };
         }
-        
+
         self.layers.push(layer);
     }
 
@@ -157,15 +177,20 @@ impl VectorData {
                 use std::io::Write;
 
                 let mut encoder = DeflateEncoder::new(Vec::new(), Compression::new(*level));
-                encoder.write_all(&serialized)
+                encoder
+                    .write_all(&serialized)
                     .map_err(|e| VeraError::EncodingError(format!("Compression failed: {}", e)))?;
-                encoder.finish()
+                encoder
+                    .finish()
                     .map_err(|e| VeraError::EncodingError(format!("Compression failed: {}", e)))
             }
-            VectorCompression::Lz4 => {
-                // TODO: Implement LZ4 compression
-                Err(VeraError::EncodingError("LZ4 compression not implemented yet".to_string()))
-            }
+            VectorCompression::Lz4 => match lz4::block::compress(&serialized, None, false) {
+                Ok(compressed) => Ok(compressed),
+                Err(e) => Err(VeraError::EncodingError(format!(
+                    "LZ4 compression failed: {}",
+                    e
+                ))),
+            },
         }
     }
 
@@ -179,18 +204,23 @@ impl VectorData {
 
                 let mut decoder = DeflateDecoder::new(data);
                 let mut decompressed = Vec::new();
-                decoder.read_to_end(&mut decompressed)
-                    .map_err(|e| VeraError::DecodingError(format!("Decompression failed: {}", e)))?;
+                decoder.read_to_end(&mut decompressed).map_err(|e| {
+                    VeraError::DecodingError(format!("Decompression failed: {}", e))
+                })?;
                 decompressed
             }
-            VectorCompression::Lz4 => {
-                // TODO: Implement LZ4 decompression
-                return Err(VeraError::DecodingError("LZ4 decompression not implemented yet".to_string()));
-            }
+            VectorCompression::Lz4 => match lz4::block::decompress(data, None) {
+                Ok(decompressed) => decompressed,
+                Err(e) => {
+                    return Err(VeraError::DecodingError(format!(
+                        "LZ4 decompression failed: {}",
+                        e
+                    )))
+                }
+            },
         };
 
-        cbor4ii::serde::from_slice(&decompressed)
-            .map_err(|e| VeraError::CborDeError(e.to_string()))
+        cbor4ii::serde::from_slice(&decompressed).map_err(|e| VeraError::CborDeError(e.to_string()))
     }
 }
 
@@ -205,24 +235,27 @@ pub struct VectorGenerator;
 
 impl VectorGenerator {
     /// Generate vector paths from an image region using edge detection
-    pub fn generate_from_image(
-        image: &image::RgbaImage,
-        _threshold: f32,
-    ) -> Result<VectorData> {
-        // TODO: Implement actual vectorization
-        // 1. Apply edge detection
-        // 2. Trace contours
-        // 3. Simplify paths
-        // 4. Convert to vector commands
-        
-        // Placeholder implementation
+    pub fn generate_from_image(image: &image::RgbaImage, threshold: f32) -> Result<VectorData> {
+        use imageproc::edges::canny;
+
         let mut vector_data = VectorData::new();
-        
+
+        // Convert to grayscale for edge detection
+        let gray_image = image::DynamicImage::ImageRgba8(image.clone()).to_luma8();
+
+        // Apply Canny edge detection
+        let low_threshold = (threshold * 255.0) as u8;
+        let high_threshold = ((threshold * 2.0).min(1.0) * 255.0) as u8;
+        let edges = canny(&gray_image, low_threshold as f32, high_threshold as f32);
+
+        // Find contours and create paths
+        let paths = Self::trace_contours(&edges, image)?;
+
         let layer = VectorLayer {
             name: "Generated".to_string(),
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
-            paths: Vec::new(),
+            paths,
             bounds: BoundingBox {
                 x: 0.0,
                 y: 0.0,
@@ -230,19 +263,149 @@ impl VectorGenerator {
                 height: image.height() as f32,
             },
         };
-        
+
         vector_data.add_layer(layer);
         Ok(vector_data)
     }
 
+    /// Trace contours from edge-detected image
+    fn trace_contours(
+        edges: &image::GrayImage,
+        original: &image::RgbaImage,
+    ) -> Result<Vec<VectorPath>> {
+        let mut paths = Vec::new();
+        let (width, height) = edges.dimensions();
+
+        // Simple contour tracing - find connected edge pixels
+        let mut visited = vec![vec![false; height as usize]; width as usize];
+
+        for y in 0..height {
+            for x in 0..width {
+                if edges.get_pixel(x, y)[0] > 0 && !visited[x as usize][y as usize] {
+                    let path = Self::trace_single_contour(edges, x, y, &mut visited, original)?;
+                    if path.commands.len() > 2 {
+                        paths.push(path);
+                    }
+                }
+            }
+        }
+
+        Ok(paths)
+    }
+
+    /// Trace a single contour starting from a point
+    fn trace_single_contour(
+        edges: &image::GrayImage,
+        start_x: u32,
+        start_y: u32,
+        visited: &mut [Vec<bool>],
+        original: &image::RgbaImage,
+    ) -> Result<VectorPath> {
+        let mut commands = Vec::new();
+        let mut current_x = start_x;
+        let mut current_y = start_y;
+        let (width, height) = edges.dimensions();
+
+        // Start the path
+        commands.push(PathCommand::MoveTo {
+            x: current_x as f32,
+            y: current_y as f32,
+        });
+
+        let mut min_x = current_x as f32;
+        let mut min_y = current_y as f32;
+        let mut max_x = current_x as f32;
+        let mut max_y = current_y as f32;
+
+        visited[current_x as usize][current_y as usize] = true;
+
+        // Follow the contour
+        loop {
+            let mut found_next = false;
+
+            // Check 8-connected neighbors
+            for dx in -1..=1i32 {
+                for dy in -1..=1i32 {
+                    if dx == 0 && dy == 0 {
+                        continue;
+                    }
+
+                    let next_x = current_x as i32 + dx;
+                    let next_y = current_y as i32 + dy;
+
+                    if next_x >= 0 && next_x < width as i32 && next_y >= 0 && next_y < height as i32
+                    {
+                        let nx = next_x as u32;
+                        let ny = next_y as u32;
+
+                        if edges.get_pixel(nx, ny)[0] > 0 && !visited[nx as usize][ny as usize] {
+                            visited[nx as usize][ny as usize] = true;
+                            current_x = nx;
+                            current_y = ny;
+
+                            commands.push(PathCommand::LineTo {
+                                x: current_x as f32,
+                                y: current_y as f32,
+                            });
+
+                            min_x = min_x.min(current_x as f32);
+                            min_y = min_y.min(current_y as f32);
+                            max_x = max_x.max(current_x as f32);
+                            max_y = max_y.max(current_y as f32);
+
+                            found_next = true;
+                            break;
+                        }
+                    }
+                }
+                if found_next {
+                    break;
+                }
+            }
+
+            if !found_next {
+                break;
+            }
+        }
+
+        // Close the path if it's long enough
+        if commands.len() > 3 {
+            commands.push(PathCommand::Close);
+        }
+
+        // Sample color from the original image
+        let sample_x = ((min_x + max_x) / 2.0) as u32;
+        let sample_y = ((min_y + max_y) / 2.0) as u32;
+        let color_pixel = original.get_pixel(
+            sample_x.min(original.width() - 1),
+            sample_y.min(original.height() - 1),
+        );
+
+        let fill_color = [
+            color_pixel[0] as f32 / 255.0,
+            color_pixel[1] as f32 / 255.0,
+            color_pixel[2] as f32 / 255.0,
+            color_pixel[3] as f32 / 255.0,
+        ];
+
+        Ok(VectorPath {
+            commands,
+            fill: Some(fill_color),
+            stroke: None,
+            stroke_width: 0.0,
+            bounds: BoundingBox {
+                x: min_x,
+                y: min_y,
+                width: max_x - min_x,
+                height: max_y - min_y,
+            },
+        })
+    }
+
     /// Generate vector paths using Lyon library
-    pub fn generate_with_lyon(
-        image: &image::RgbaImage,
-        _tolerance: f32,
-    ) -> Result<VectorData> {
-        // TODO: Implement Lyon-based vectorization
-        // This would use lyon::path and lyon::algorithms for path generation
-        
-        Self::generate_from_image(image, 0.1)
+    pub fn generate_with_lyon(image: &image::RgbaImage, tolerance: f32) -> Result<VectorData> {
+        // For now, use the basic edge detection approach
+        // Future enhancement: implement proper Lyon-based tessellation
+        Self::generate_from_image(image, tolerance)
     }
 }

@@ -7,17 +7,14 @@
 
 use image::GenericImageView;
 
-pub use vera::{Encoder, VeraError, Result};
+pub use vera::{Encoder, Result, VeraError};
 
 /// Re-export encoding related types from vera
 pub mod encoding {
     pub use vera::metadata::{
-        CompressionSettings, 
-        RasterCompression, 
-        VectorCompression,
-        SegmentationMethod,
+        CompressionSettings, RasterCompression, SegmentationMethod, VectorCompression,
     };
-    pub use vera::tiles::{TilePyramid, TileCompressor};
+    pub use vera::tiles::{TileCompressor, TilePyramid};
     pub use vera::vector::VectorGenerator;
 }
 
@@ -32,6 +29,6 @@ pub fn encode_image_to_vera<W: std::io::Write>(
     let encoder = Encoder::new(writer, width, height)
         .with_tile_size(tile_size)?
         .with_max_zoom_level(max_zoom)?;
-    
+
     encoder.encode(image)
 }

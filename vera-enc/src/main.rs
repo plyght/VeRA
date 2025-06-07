@@ -101,7 +101,7 @@ fn main() {
     // Run encoder
     if let Err(e) = run(args) {
         error!("Encoding failed: {}", e);
-        
+
         // Map to appropriate exit codes
         let exit_code = match e.downcast_ref::<VeraError>() {
             Some(VeraError::InvalidFormat(_)) => 1,
@@ -109,7 +109,7 @@ fn main() {
             Some(VeraError::IoError(_)) => 1,
             _ => 2,
         };
-        
+
         process::exit(exit_code);
     }
 }
@@ -133,10 +133,10 @@ fn run(args: Args) -> Result<()> {
     if let Some(ref pb) = progress {
         pb.set_message("Loading input image...");
     }
-    
+
     let image = image::open(&args.input)?;
     let (width, height) = image.dimensions();
-    
+
     info!("Loaded image: {}x{} pixels", width, height);
 
     if let Some(ref pb) = progress {
@@ -152,24 +152,21 @@ fn run(args: Args) -> Result<()> {
 
     // Configure segmentation
     let segmentation = match args.segmentation {
-        SegmentationMode::EdgeDetection => {
-            vera::metadata::SegmentationMethod::EdgeDetection {
-                threshold: args.edge_threshold,
-            }
-        }
-        SegmentationMode::Manual => {
-            vera::metadata::SegmentationMethod::Manual {
-                regions: Vec::new(),
-            }
-        }
-        SegmentationMode::Hybrid => {
-            vera::metadata::SegmentationMethod::Hybrid {
-                edge_threshold: args.edge_threshold,
-                ml_model: None,
-            }
-        }
+        SegmentationMode::EdgeDetection => vera::metadata::SegmentationMethod::EdgeDetection {
+            threshold: args.edge_threshold,
+        },
+        SegmentationMode::Manual => vera::metadata::SegmentationMethod::Manual {
+            regions: vera::metadata::ManualRegions {
+                vector_regions: Vec::new(),
+                raster_regions: Vec::new(),
+            },
+        },
+        SegmentationMode::Hybrid => vera::metadata::SegmentationMethod::Hybrid {
+            edge_threshold: args.edge_threshold,
+            ml_model: None,
+        },
     };
-    
+
     encoder = encoder.with_segmentation(segmentation);
 
     if let Some(ref pb) = progress {
@@ -188,7 +185,11 @@ fn run(args: Args) -> Result<()> {
     let input_size = std::fs::metadata(&args.input)?.len();
     let compression_ratio = input_size as f64 / output_size as f64;
 
-    info!("Output file: {} ({} bytes)", args.output.display(), output_size);
+    info!(
+        "Output file: {} ({} bytes)",
+        args.output.display(),
+        output_size
+    );
     info!("Compression ratio: {:.2}x", compression_ratio);
     info!("Encoding completed successfully");
 
@@ -214,7 +215,10 @@ fn validate_args(args: &Args) -> Result<()> {
     }
 
     if args.tile_size < 64 || args.tile_size > 2048 {
-        anyhow::bail!("Tile size must be between 64 and 2048, got {}", args.tile_size);
+        anyhow::bail!(
+            "Tile size must be between 64 and 2048, got {}",
+            args.tile_size
+        );
     }
 
     // Validate zoom level
@@ -228,16 +232,25 @@ fn validate_args(args: &Args) -> Result<()> {
 
     // Validate edge threshold
     if !(0.0..=1.0).contains(&args.edge_threshold) {
-        anyhow::bail!("Edge threshold must be between 0.0 and 1.0, got {}", args.edge_threshold);
+        anyhow::bail!(
+            "Edge threshold must be between 0.0 and 1.0, got {}",
+            args.edge_threshold
+        );
     }
 
     // Validate quality settings
     if args.vector_quality > 100 {
-        anyhow::bail!("Vector quality must be between 0 and 100, got {}", args.vector_quality);
+        anyhow::bail!(
+            "Vector quality must be between 0 and 100, got {}",
+            args.vector_quality
+        );
     }
 
     if args.raster_quality > 100 {
-        anyhow::bail!("Raster quality must be between 0 and 100, got {}", args.raster_quality);
+        anyhow::bail!(
+            "Raster quality must be between 0 and 100, got {}",
+            args.raster_quality
+        );
     }
 
     // Warn about conflicting flags

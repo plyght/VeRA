@@ -19,7 +19,7 @@ fn test_metadata_cbor_serialization() {
     let metadata = Metadata::new(1920, 1080);
     let serialized = metadata.to_cbor().expect("Failed to serialize");
     let deserialized = Metadata::from_cbor(&serialized).expect("Failed to deserialize");
-    
+
     assert_eq!(metadata.width, deserialized.width);
     assert_eq!(metadata.height, deserialized.height);
     assert_eq!(metadata.version, deserialized.version);

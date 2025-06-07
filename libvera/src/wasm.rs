@@ -1,9 +1,9 @@
 //! WebAssembly bindings for libvera
 
-use wasm_bindgen::prelude::*;
 use js_sys::{Array, Uint8Array};
+use wasm_bindgen::prelude::*;
 
-use crate::{Decoder, VeraError, Result};
+use crate::{Decoder, Result, VeraError};
 
 /// JavaScript-friendly error type
 #[wasm_bindgen]
@@ -98,10 +98,9 @@ impl VeraWasmDecoder {
     #[wasm_bindgen]
     pub fn metadata_json(&self) -> Result<String, VeraWasmError> {
         let metadata = self.decoder.metadata()?;
-        serde_json::to_string(metadata)
-            .map_err(|e| VeraWasmError {
-                message: format!("Failed to serialize metadata: {}", e),
-            })
+        serde_json::to_string(metadata).map_err(|e| VeraWasmError {
+            message: format!("Failed to serialize metadata: {}", e),
+        })
     }
 }
 
@@ -140,7 +139,7 @@ impl VeraWasmUtils {
         let scaled_y = y / scale;
         let tile_x = scaled_x / tile_size;
         let tile_y = scaled_y / tile_size;
-        
+
         let array = Array::new();
         array.push(&JsValue::from(tile_x));
         array.push(&JsValue::from(tile_y));
@@ -155,7 +154,7 @@ impl VeraWasmUtils {
         let y = tile_y * tile_size * scale;
         let width = tile_size * scale;
         let height = tile_size * scale;
-        
+
         let array = Array::new();
         array.push(&JsValue::from(x));
         array.push(&JsValue::from(y));

@@ -10,7 +10,7 @@ pub enum ColorSpace {
     DisplayP3,
     Rec2020,
     ProPhotoRgb,
-    Custom { 
+    Custom {
         name: String,
         icc_profile: Option<Vec<u8>>,
     },
@@ -58,18 +58,34 @@ pub enum RasterCompression {
 /// Segmentation method used for vector/raster separation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SegmentationMethod {
-    EdgeDetection { threshold: f32 },
-    MachineLearning { model: String },
-    Manual { regions: Vec<Region> },
-    Hybrid { 
+    Auto,
+    EdgeDetection {
+        threshold: f32,
+    },
+    MachineLearning {
+        model: String,
+    },
+    Manual {
+        regions: ManualRegions,
+    },
+    VectorOnly,
+    RasterOnly,
+    Hybrid {
         edge_threshold: f32,
         ml_model: Option<String>,
     },
 }
 
+/// Manual region specification
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ManualRegions {
+    pub vector_regions: Vec<Region>,
+    pub raster_regions: Vec<Region>,
+}
+
 impl Default for SegmentationMethod {
     fn default() -> Self {
-        Self::EdgeDetection { threshold: 0.1 }
+        Self::Auto
     }
 }
 
@@ -95,41 +111,41 @@ pub enum RegionType {
 pub struct Metadata {
     /// VeRA format version
     pub version: u32,
-    
+
     /// Original image dimensions
     pub width: u32,
     pub height: u32,
-    
+
     /// Color space information
     pub color_space: ColorSpace,
-    
+
     /// Tile size in pixels
     pub tile_size: u32,
-    
+
     /// Maximum zoom level
     pub max_zoom_level: u8,
-    
+
     /// Number of vector regions
     pub vector_regions: u32,
-    
+
     /// Number of raster tiles
     pub raster_tiles: u32,
-    
+
     /// Compression settings
     pub compression: CompressionSettings,
-    
+
     /// Segmentation method used
     pub segmentation: SegmentationMethod,
-    
+
     /// Creation timestamp (Unix timestamp)
     pub created_at: u64,
-    
+
     /// Source image hash (for integrity checking)
     pub source_hash: String,
-    
+
     /// Custom metadata fields
     pub custom: HashMap<String, String>,
-    
+
     /// Encoder information
     pub encoder: EncoderInfo,
 }
@@ -178,46 +194,46 @@ impl Metadata {
 
     /// Serialize metadata to CBOR bytes
     pub fn to_cbor(&self) -> Result<Vec<u8>> {
-        cbor4ii::serde::to_vec(vec![], self)
-            .map_err(|e| VeraError::CborError(e.to_string()))
+        cbor4ii::serde::to_vec(vec![], self).map_err(|e| VeraError::CborError(e.to_string()))
     }
 
     /// Deserialize metadata from CBOR bytes
     pub fn from_cbor(data: &[u8]) -> Result<Self> {
-        cbor4ii::serde::from_slice(data)
-            .map_err(|e| VeraError::CborDeError(e.to_string()))
+        cbor4ii::serde::from_slice(data).map_err(|e| VeraError::CborDeError(e.to_string()))
     }
 
     /// Validate metadata consistency
     pub fn validate(&self) -> Result<()> {
         if self.version > crate::VERA_VERSION {
-            return Err(VeraError::UnsupportedVersion { 
-                version: self.version 
+            return Err(VeraError::UnsupportedVersion {
+                version: self.version,
             });
         }
 
         if self.width == 0 || self.height == 0 {
             return Err(VeraError::InvalidFormat(
-                "Image dimensions must be greater than zero".to_string()
+                "Image dimensions must be greater than zero".to_string(),
             ));
         }
 
         if self.width > crate::MAX_DIMENSION || self.height > crate::MAX_DIMENSION {
-            return Err(VeraError::InvalidFormat(
-                format!("Image dimensions exceed maximum of {}", crate::MAX_DIMENSION)
-            ));
+            return Err(VeraError::InvalidFormat(format!(
+                "Image dimensions exceed maximum of {}",
+                crate::MAX_DIMENSION
+            )));
         }
 
         if self.tile_size == 0 || (self.tile_size & (self.tile_size - 1)) != 0 {
             return Err(VeraError::InvalidFormat(
-                "Tile size must be a power of two and greater than zero".to_string()
+                "Tile size must be a power of two and greater than zero".to_string(),
             ));
         }
 
         if self.max_zoom_level > crate::MAX_ZOOM_LEVELS {
-            return Err(VeraError::InvalidFormat(
-                format!("Zoom level exceeds maximum of {}", crate::MAX_ZOOM_LEVELS)
-            ));
+            return Err(VeraError::InvalidFormat(format!(
+                "Zoom level exceeds maximum of {}",
+                crate::MAX_ZOOM_LEVELS
+            )));
         }
 
         Ok(())
