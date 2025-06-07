@@ -1,0 +1,79 @@
+# Rust
+target/
+Cargo.lock
+
+# Build artifacts
+*.pdb
+*.exe
+*.dll
+*.dylib
+*.so
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Test artifacts
+*.profraw
+*.profdata
+
+# Coverage reports
+lcov.info
+coverage/
+tarpaulin-report.html
+
+# Benchmark results
+criterion/
+
+# Documentation build
+book/
+docs/_site/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Package manager locks (keep workspace Cargo.lock, ignore others)
+**/node_modules/
+package-lock.json
+yarn.lock
+
+# Platform specific
+.fseventsd/
+.Spotlight-V100/
+.Trashes/
+
+# VeRA specific
+*.vera
+examples/output/
+test_images/
+fuzz/artifacts/
+fuzz/corpus/
+
+# Profiling and debugging
+perf.data*
+callgrind.out.*
+massif.out.*
+
+# Distribution
+dist/
+release/
+*.tar.gz
+*.zip
+
+# Local development
+scratch/
+playground/
+todo.md
+notes.txt

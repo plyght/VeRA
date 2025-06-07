@@ -1,0 +1,50 @@
+[package]
+name = "vera-enc"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "VeRA format encoder - converts images to VeRA format"
+keywords.workspace = true
+categories.workspace = true
+
+[lib]
+name = "vera_enc"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vera-enc"
+path = "src/main.rs"
+
+[dependencies]
+# Core dependencies
+vera = { package = "libvera", path = "../libvera" }
+serde.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+log.workspace = true
+env_logger.workspace = true
+
+# Image processing
+image.workspace = true
+imageproc.workspace = true
+lyon.workspace = true
+
+# Encoding
+cbor4ii.workspace = true
+flate2.workspace = true
+
+# CLI
+clap.workspace = true
+indicatif.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+proptest.workspace = true
+tempfile = "3.8"
+
+[[bench]]
+name = "encoder_benchmark"
+harness = false
