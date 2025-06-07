@@ -9,7 +9,7 @@ VeRA is a production-ready hybrid image format that combines vector graphics and
 
 ## Features
 
-- **Hybrid Format**: Combines vector paths for geometric regions with high-quality raster tiles for photographic content
+- **Hybrid Format**: Combines vector paths for geometric regions with high-quality raster tiles for photographic content.
 - **Infinite Zoom**: No visible quality degradation at any zoom level
 - **Smart Segmentation**: Automatic detection of vector-friendly vs. texture-heavy regions
 - **Progressive Loading**: Stream and render tiles on demand
