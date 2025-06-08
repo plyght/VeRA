@@ -4,7 +4,7 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use crate::error::{Result, VeraError};
 use crate::metadata::Metadata;
 
-/// VeRA file container layout
+/// `VeRA` file container layout
 ///
 /// File structure:
 /// - Header (32 bytes)
@@ -13,8 +13,8 @@ use crate::metadata::Metadata;
 /// - Tile index (variable size)
 /// - Tile data sections (variable size)
 /// - Footer (32 bytes)
-
-/// VeRA file header
+///
+/// `VeRA` file header
 #[derive(Debug, Clone)]
 pub struct Header {
     /// Magic bytes: "VERA"
@@ -45,10 +45,12 @@ impl Header {
     pub const SIZE: usize = 64;
 
     /// Create a new header
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             magic: *crate::VERA_MAGIC,
             version: crate::VERA_VERSION,
+            #[allow(clippy::cast_possible_truncation)]
             header_size: Self::SIZE as u32,
             metadata_offset: Self::SIZE as u64,
             metadata_size: 0,
@@ -62,6 +64,9 @@ impl Header {
     }
 
     /// Read header from a reader
+    ///
+    /// # Errors
+    /// Returns an error if the reader fails or if the magic bytes are invalid
     pub fn read_from<R: Read>(reader: &mut R) -> Result<Self> {
         let mut buffer = [0u8; Self::SIZE];
         reader.read_exact(&mut buffer)?;
@@ -69,8 +74,7 @@ impl Header {
         let magic = [buffer[0], buffer[1], buffer[2], buffer[3]];
         if magic != *crate::VERA_MAGIC {
             return Err(VeraError::InvalidFormat(format!(
-                "Invalid magic bytes: {:?}",
-                magic
+                "Invalid magic bytes: {magic:?}"
             )));
         }
 
@@ -116,6 +120,9 @@ impl Header {
     }
 
     /// Write header to a writer
+    ///
+    /// # Errors
+    /// Returns an error if the writer fails
     pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<()> {
         let mut buffer = [0u8; Self::SIZE];
 
@@ -136,6 +143,9 @@ impl Header {
     }
 
     /// Validate header values
+    ///
+    /// # Errors
+    /// Returns an error if any header values are invalid
     pub fn validate(&self) -> Result<()> {
         if self.magic != *crate::VERA_MAGIC {
             return Err(VeraError::InvalidFormat("Invalid magic bytes".to_string()));
@@ -147,11 +157,11 @@ impl Header {
             });
         }
 
-        if self.header_size != Self::SIZE as u32 {
+        if self.header_size != u32::try_from(Self::SIZE).unwrap() {
             return Err(VeraError::InvalidFormat("Invalid header size".to_string()));
         }
 
-        if self.metadata_offset < self.header_size as u64 {
+        if self.metadata_offset < u64::from(self.header_size) {
             return Err(VeraError::InvalidFormat(
                 "Metadata offset is before end of header".to_string(),
             ));
@@ -188,6 +198,7 @@ pub struct TileIndexEntry {
 
 impl TileIndexEntry {
     /// Serialize to bytes
+    #[must_use]
     pub fn to_bytes(&self) -> [u8; 29] {
         let mut buffer = [0u8; 29];
         buffer[0] = self.level;
@@ -201,7 +212,8 @@ impl TileIndexEntry {
     }
 
     /// Deserialize from bytes
-    pub fn from_bytes(buffer: &[u8; 29]) -> Self {
+    #[must_use]
+    pub const fn from_bytes(buffer: &[u8; 29]) -> Self {
         Self {
             level: buffer[0],
             x: u32::from_le_bytes([buffer[1], buffer[2], buffer[3], buffer[4]]),
@@ -226,6 +238,7 @@ pub struct TileIndex {
 
 impl TileIndex {
     /// Create a new empty tile index
+    #[must_use]
     pub fn new() -> Self {
         Self {
             entries: HashMap::new(),
@@ -238,15 +251,17 @@ impl TileIndex {
     }
 
     /// Get a tile entry
+    #[must_use]
     pub fn get_tile(&self, level: u8, x: u32, y: u32) -> Option<&TileIndexEntry> {
         self.entries.get(&(level, x, y))
     }
 
     /// Serialize index to bytes
+    #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut buffer = Vec::new();
 
-        let count = self.entries.len() as u32;
+        let count = u32::try_from(self.entries.len()).expect("Too many tile entries");
         buffer.extend_from_slice(&count.to_le_bytes());
 
         for entry in self.entries.values() {
@@ -257,12 +272,16 @@ impl TileIndex {
     }
 
     /// Deserialize index from bytes
+    ///
+    /// # Errors
+    /// Returns an error if the data is corrupted or has an invalid format
     pub fn from_bytes(data: &[u8]) -> Result<Self> {
         if data.len() < 4 {
             return Err(VeraError::CorruptedData("Tile index too small".to_string()));
         }
 
-        let count = u32::from_le_bytes([data[0], data[1], data[2], data[3]]) as usize;
+        let count = usize::try_from(u32::from_le_bytes([data[0], data[1], data[2], data[3]]))
+            .map_err(|_| VeraError::CorruptedData("Invalid tile count".to_string()))?;
         let expected_size = 4 + count * 29;
 
         if data.len() != expected_size {
@@ -293,7 +312,7 @@ impl Default for TileIndex {
     }
 }
 
-/// VeRA container for reading and writing VeRA files
+/// `VeRA` container for reading and writing `VeRA` files
 pub struct Container<T> {
     /// Underlying reader or writer
     pub inner: T,
@@ -306,7 +325,10 @@ pub struct Container<T> {
 }
 
 impl<R: Read + Seek> Container<R> {
-    /// Open a VeRA file for reading
+    /// Open a `VeRA` file for reading
+    ///
+    /// # Errors
+    /// Returns an error if the file cannot be read or is corrupted
     pub fn open(mut reader: R) -> Result<Self> {
         let header = Header::read_from(&mut reader)?;
         header.validate()?;
@@ -353,6 +375,9 @@ impl<R: Read + Seek> Container<R> {
     }
 
     /// Read vector data
+    ///
+    /// # Errors
+    /// Returns an error if the vector data cannot be read
     pub fn read_vector_data(&mut self) -> Result<Vec<u8>> {
         self.inner
             .seek(SeekFrom::Start(self.header.vector_offset))?;
@@ -364,6 +389,9 @@ impl<R: Read + Seek> Container<R> {
     }
 
     /// Read tile data
+    ///
+    /// # Errors
+    /// Returns an error if the tile data cannot be read or checksum fails
     pub fn read_tile_data(&mut self, entry: &TileIndexEntry) -> Result<Vec<u8>> {
         let offset = self.header.tile_data_offset + entry.offset;
         self.inner.seek(SeekFrom::Start(offset))?;

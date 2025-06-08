@@ -17,8 +17,8 @@ pub struct Renderer {
 
 #[cfg(feature = "gpu")]
 struct GpuState {
-    device: wgpu::Device,
-    queue: wgpu::Queue,
+    _device: wgpu::Device,
+    _queue: wgpu::Queue,
     // Additional GPU state will be added here
 }
 

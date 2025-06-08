@@ -6,29 +6,41 @@ use crate::error::{Result, VeraError};
 use crate::format::VeraFormat;
 use crate::metadata::Metadata;
 
-/// VeRA file decoder
+/// `VeRA` file decoder
 pub struct Decoder<R> {
     format: VeraFormat<R>,
 }
 
 impl<R: Read + Seek> Decoder<R> {
     /// Create a new decoder from a reader
+    ///
+    /// # Errors
+    /// Returns an error if the format cannot be loaded
     pub fn new(reader: R) -> Result<Self> {
         let format = VeraFormat::open(reader)?;
         Ok(Self { format })
     }
 
     /// Get file metadata
+    ///
+    /// # Errors
+    /// Returns an error if metadata is not available
     pub fn metadata(&self) -> Result<&Metadata> {
         self.format.metadata()
     }
 
     /// Get image dimensions
+    ///
+    /// # Errors
+    /// Returns an error if dimensions cannot be determined
     pub fn dimensions(&self) -> Result<(u32, u32)> {
         self.format.dimensions()
     }
 
     /// Decode a specific tile
+    ///
+    /// # Errors
+    /// Returns an error if the tile cannot be found or decoded
     pub fn decode_tile(&mut self, level: u8, x: u32, y: u32) -> Result<image::RgbaImage> {
         if !self.format.has_tile(level, x, y) {
             return Err(VeraError::TileNotFound { level, x, y });
@@ -53,13 +65,18 @@ impl<R: Read + Seek> Decoder<R> {
         let metadata = self.metadata()?;
         let compression = &metadata.compression.raster_compression;
 
-        use crate::tiles::TileCompressor;
-        let image = TileCompressor::decompress(&compressed_data, compression)?;
+        let image = {
+            use crate::tiles::TileCompressor;
+            TileCompressor::decompress(&compressed_data, compression)?
+        };
 
         Ok(image)
     }
 
     /// Decode a region of the image at a specific zoom level
+    ///
+    /// # Errors
+    /// Returns an error if tiles cannot be decoded or region is invalid
     pub fn decode_region(
         &mut self,
         x: u32,
@@ -88,32 +105,14 @@ impl<R: Read + Seek> Decoder<R> {
             let tile_pixel_y = tile_y * tile_size * scale;
 
             // Calculate the overlap between the tile and the requested region
-            let overlay_x = if tile_pixel_x >= x {
-                0
-            } else {
-                x - tile_pixel_x
-            };
-            let overlay_y = if tile_pixel_y >= y {
-                0
-            } else {
-                y - tile_pixel_y
-            };
+            let overlay_x = x.saturating_sub(tile_pixel_x);
+            let overlay_y = y.saturating_sub(tile_pixel_y);
 
-            let dest_x = if tile_pixel_x >= x {
-                tile_pixel_x - x
-            } else {
-                0
-            };
-            let dest_y = if tile_pixel_y >= y {
-                tile_pixel_y - y
-            } else {
-                0
-            };
+            let dest_x = tile_pixel_x.saturating_sub(x);
+            let dest_y = tile_pixel_y.saturating_sub(y);
 
             // Only overlay if the tile intersects with our region
             if dest_x < width && dest_y < height {
-                use image::imageops;
-
                 // Create a view of the tile that fits in our region
                 let crop_width = (tile_size * scale - overlay_x).min(width - dest_x);
                 let crop_height = (tile_size * scale - overlay_y).min(height - dest_y);
@@ -141,7 +140,12 @@ impl<R: Read + Seek> Decoder<R> {
                         cropped_tile
                     };
 
-                    imageops::overlay(&mut result_image, &final_tile, dest_x as i64, dest_y as i64);
+                    image::imageops::overlay(
+                        &mut result_image,
+                        &final_tile,
+                        i64::from(dest_x),
+                        i64::from(dest_y),
+                    );
                 }
             }
         }
@@ -150,6 +154,9 @@ impl<R: Read + Seek> Decoder<R> {
     }
 
     /// Get vector data
+    ///
+    /// # Errors
+    /// Returns an error if vector data cannot be read or decompressed
     pub fn vector_data(&mut self) -> Result<Vec<u8>> {
         if self.format.container.header.vector_size == 0 {
             return Ok(Vec::new());
@@ -160,8 +167,10 @@ impl<R: Read + Seek> Decoder<R> {
         let metadata = self.metadata()?;
         let compression = &metadata.compression.vector_compression;
 
-        use crate::vector::VectorData;
-        let vector_data = VectorData::from_bytes(&compressed_data, compression)?;
+        let vector_data = {
+            use crate::vector::VectorData;
+            VectorData::from_bytes(&compressed_data, compression)?
+        };
 
         // Return the decompressed CBOR data
         cbor4ii::serde::to_vec(vec![], &vector_data)
@@ -169,6 +178,9 @@ impl<R: Read + Seek> Decoder<R> {
     }
 
     /// Check if the file is valid
+    ///
+    /// # Errors
+    /// Returns an error if the file is corrupted or invalid
     pub fn validate(&self) -> Result<()> {
         self.format.validate()
     }

@@ -2,10 +2,10 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
 #![allow(clippy::module_name_repetitions)]
 
-//! VeRA - A hybrid vector-raster image format for infinite zoom photography
+//! `VeRA` - A hybrid vector-raster image format for infinite zoom photography
 //!
-//! This library provides the core functionality for decoding and rendering VeRA format images.
-//! VeRA combines vector graphics for geometric regions with high-quality raster tiles for
+//! This library provides the core functionality for decoding and rendering `VeRA` format images.
+//! `VeRA` combines vector graphics for geometric regions with high-quality raster tiles for
 //! photographic content, enabling infinite zoom without visible quality loss.
 
 pub mod container;

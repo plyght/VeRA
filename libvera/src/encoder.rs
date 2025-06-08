@@ -5,7 +5,7 @@ use image::GenericImageView;
 use crate::error::{Result, VeraError};
 use crate::metadata::{Metadata, SegmentationMethod};
 
-/// VeRA file encoder
+/// `VeRA` file encoder
 pub struct Encoder<W> {
     writer: W,
     metadata: Metadata,
@@ -19,12 +19,16 @@ impl<W: Write> Encoder<W> {
     }
 
     /// Set segmentation method
+    #[must_use]
     pub fn with_segmentation(mut self, method: SegmentationMethod) -> Self {
         self.metadata.segmentation = method;
         self
     }
 
     /// Set tile size
+    ///
+    /// # Errors
+    /// Returns an error if the tile size is not a power of two
     pub fn with_tile_size(mut self, size: u32) -> Result<Self> {
         if size == 0 || (size & (size - 1)) != 0 {
             return Err(VeraError::EncodingError(
@@ -36,6 +40,9 @@ impl<W: Write> Encoder<W> {
     }
 
     /// Set maximum zoom level
+    ///
+    /// # Errors
+    /// Returns an error if the zoom level exceeds the maximum
     pub fn with_max_zoom_level(mut self, level: u8) -> Result<Self> {
         if level > crate::MAX_ZOOM_LEVELS {
             return Err(VeraError::EncodingError(format!(
@@ -47,7 +54,10 @@ impl<W: Write> Encoder<W> {
         Ok(self)
     }
 
-    /// Encode an image to VeRA format
+    /// Encode an image to `VeRA` format
+    ///
+    /// # Errors
+    /// Returns an error if encoding fails
     pub fn encode(mut self, image: &image::DynamicImage) -> Result<()> {
         self.validate_input(image)?;
 
@@ -58,7 +68,7 @@ impl<W: Write> Encoder<W> {
         let (vector_regions, raster_regions) = self.segment_image(&rgba_image)?;
 
         // 2. Generate vector paths for vector regions
-        let vector_data = self.generate_vector_data(&rgba_image, &vector_regions)?;
+        let vector_data = Self::generate_vector_data(&rgba_image, &vector_regions)?;
 
         // 3. Create tile pyramid for raster regions
         let (tiles, tile_index) = self.create_tile_pyramid(&rgba_image, &raster_regions)?;
@@ -79,7 +89,7 @@ impl<W: Write> Encoder<W> {
         match &self.metadata.segmentation {
             SegmentationMethod::Auto => {
                 // Simple automatic segmentation based on edge density
-                self.auto_segment(image)
+                Ok(Self::auto_segment(image))
             }
             SegmentationMethod::Manual { regions } => {
                 // Use manually specified regions
@@ -111,16 +121,15 @@ impl<W: Write> Encoder<W> {
             }
             _ => {
                 // For other methods, fall back to auto
-                self.auto_segment(image)
+                Ok(Self::auto_segment(image))
             }
         }
     }
 
     /// Automatic segmentation based on edge density
     fn auto_segment(
-        &self,
         image: &image::RgbaImage,
-    ) -> Result<(Vec<crate::metadata::Region>, Vec<crate::metadata::Region>)> {
+    ) -> (Vec<crate::metadata::Region>, Vec<crate::metadata::Region>) {
         use crate::metadata::{Region, RegionType};
         use imageproc::edges::canny;
 
@@ -133,8 +142,8 @@ impl<W: Write> Encoder<W> {
         // Divide image into blocks and analyze edge density
         let block_size = 64u32;
         let (width, height) = image.dimensions();
-        let blocks_x = (width + block_size - 1) / block_size;
-        let blocks_y = (height + block_size - 1) / block_size;
+        let blocks_x = width.div_ceil(block_size);
+        let blocks_y = height.div_ceil(block_size);
 
         let mut vector_regions = Vec::new();
         let mut raster_regions = Vec::new();
@@ -158,6 +167,7 @@ impl<W: Write> Encoder<W> {
                     }
                 }
 
+                #[allow(clippy::cast_precision_loss)]
                 let edge_density = edge_count as f32 / total_pixels as f32;
 
                 // Use vector representation for regions with high edge density
@@ -183,12 +193,11 @@ impl<W: Write> Encoder<W> {
             }
         }
 
-        Ok((vector_regions, raster_regions))
+        (vector_regions, raster_regions)
     }
 
     /// Generate vector data for vector regions
     fn generate_vector_data(
-        &self,
         image: &image::RgbaImage,
         regions: &[crate::metadata::Region],
     ) -> Result<crate::vector::VectorData> {
@@ -216,11 +225,8 @@ impl<W: Write> Encoder<W> {
                             crate::vector::PathCommand::MoveTo {
                                 ref mut x,
                                 ref mut y,
-                            } => {
-                                *x += region.x as f32;
-                                *y += region.y as f32;
                             }
-                            crate::vector::PathCommand::LineTo {
+                            | crate::vector::PathCommand::LineTo {
                                 ref mut x,
                                 ref mut y,
                             } => {

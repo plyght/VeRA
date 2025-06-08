@@ -202,13 +202,13 @@ impl TileCompressor {
 
         let encoder = Encoder::from_rgba(pixels, width, height);
 
-        let encoded: WebPMemory = if lossless {
+        let webp_data: WebPMemory = if lossless {
             encoder.encode_lossless()
         } else {
             encoder.encode(quality as f32)
         };
 
-        Ok(encoded.to_vec())
+        Ok(webp_data.to_vec())
     }
 
     fn compress_avif(tile: &Tile, _quality: u8) -> Result<Vec<u8>> {
