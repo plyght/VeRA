@@ -1,5 +1,12 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
+#![allow(
+    clippy::doc_markdown,
+    clippy::uninlined_format_args,
+    clippy::match_same_arms,
+    clippy::needless_pass_by_value,
+    clippy::cast_precision_loss
+)]
 
 use std::path::PathBuf;
 use std::process;

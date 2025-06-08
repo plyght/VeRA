@@ -3,7 +3,7 @@
 use js_sys::{Array, Uint8Array};
 use wasm_bindgen::prelude::*;
 
-use crate::{Decoder, Result, VeraError};
+use crate::{Decoder, VeraError};
 
 /// JavaScript-friendly error type
 #[wasm_bindgen]
@@ -37,7 +37,7 @@ pub struct VeraWasmDecoder {
 impl VeraWasmDecoder {
     /// Create a new decoder from byte array
     #[wasm_bindgen(constructor)]
-    pub fn new(data: &[u8]) -> Result<VeraWasmDecoder, VeraWasmError> {
+    pub fn new(data: &[u8]) -> std::result::Result<VeraWasmDecoder, VeraWasmError> {
         let cursor = std::io::Cursor::new(data.to_vec());
         let decoder = Decoder::new(cursor)?;
         Ok(Self { decoder })
@@ -45,7 +45,7 @@ impl VeraWasmDecoder {
 
     /// Get image dimensions
     #[wasm_bindgen]
-    pub fn dimensions(&self) -> Result<Array, VeraWasmError> {
+    pub fn dimensions(&self) -> std::result::Result<Array, VeraWasmError> {
         let (width, height) = self.decoder.dimensions()?;
         let array = Array::new();
         array.push(&JsValue::from(width));
@@ -55,21 +55,26 @@ impl VeraWasmDecoder {
 
     /// Get tile size
     #[wasm_bindgen]
-    pub fn tile_size(&self) -> Result<u32, VeraWasmError> {
+    pub fn tile_size(&self) -> std::result::Result<u32, VeraWasmError> {
         let metadata = self.decoder.metadata()?;
         Ok(metadata.tile_size)
     }
 
     /// Get maximum zoom level
     #[wasm_bindgen]
-    pub fn max_zoom_level(&self) -> Result<u8, VeraWasmError> {
+    pub fn max_zoom_level(&self) -> std::result::Result<u8, VeraWasmError> {
         let metadata = self.decoder.metadata()?;
         Ok(metadata.max_zoom_level)
     }
 
     /// Decode a tile and return as RGBA bytes
     #[wasm_bindgen]
-    pub fn decode_tile(&mut self, level: u8, x: u32, y: u32) -> Result<Uint8Array, VeraWasmError> {
+    pub fn decode_tile(
+        &mut self,
+        level: u8,
+        x: u32,
+        y: u32,
+    ) -> std::result::Result<Uint8Array, VeraWasmError> {
         let image = self.decoder.decode_tile(level, x, y)?;
         let pixels = image.as_raw();
         let array = Uint8Array::new_with_length(pixels.len() as u32);
@@ -86,7 +91,7 @@ impl VeraWasmDecoder {
         width: u32,
         height: u32,
         level: u8,
-    ) -> Result<Uint8Array, VeraWasmError> {
+    ) -> std::result::Result<Uint8Array, VeraWasmError> {
         let image = self.decoder.decode_region(x, y, width, height, level)?;
         let pixels = image.as_raw();
         let array = Uint8Array::new_with_length(pixels.len() as u32);
@@ -96,9 +101,9 @@ impl VeraWasmDecoder {
 
     /// Get metadata as JSON string
     #[wasm_bindgen]
-    pub fn metadata_json(&self) -> Result<String, VeraWasmError> {
+    pub fn metadata_json(&self) -> std::result::Result<String, VeraWasmError> {
         let metadata = self.decoder.metadata()?;
-        serde_json::to_string(metadata).map_err(|e| VeraWasmError {
+        serde_json::to_string(&metadata).map_err(|e| VeraWasmError {
             message: format!("Failed to serialize metadata: {}", e),
         })
     }
@@ -167,6 +172,6 @@ impl VeraWasmUtils {
 /// Initialize WASM module
 #[wasm_bindgen(start)]
 pub fn init() {
-    #[cfg(feature = "console_error_panic_hook")]
-    console_error_panic_hook::set_once();
+    // WASM module initialization
+    // Console error panic hook can be added here when needed
 }

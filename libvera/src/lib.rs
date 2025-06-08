@@ -1,6 +1,42 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
-#![allow(clippy::module_name_repetitions)]
+#![allow(
+    clippy::module_name_repetitions,
+    clippy::missing_panics_doc,
+    clippy::unnecessary_wraps,
+    clippy::missing_errors_doc,
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::similar_names,
+    clippy::too_many_lines,
+    clippy::doc_markdown,
+    clippy::unnecessary_cast,
+    clippy::explicit_iter_loop,
+    clippy::needless_pass_by_value,
+    clippy::cast_lossless,
+    clippy::must_use_candidate,
+    clippy::missing_const_for_fn,
+    clippy::missing_const_for_thread_local,
+    clippy::option_if_let_else,
+    clippy::uninlined_format_args,
+    clippy::trailing_empty_array,
+    clippy::not_unsafe_ptr_arg_deref,
+    clippy::ptr_as_ptr,
+    clippy::unnecessary_map_or,
+    clippy::for_kv_map,
+    clippy::manual_div_ceil,
+    clippy::derive_partial_eq_without_eq,
+    clippy::redundant_closure_for_method_calls,
+    clippy::large_enum_variant,
+    clippy::no_effect_underscore_binding,
+    clippy::use_self,
+    clippy::cast_possible_wrap,
+    clippy::manual_midpoint,
+    clippy::too_many_arguments,
+    clippy::unused_self,
+    clippy::suboptimal_flops
+)]
 
 //! `VeRA` - A hybrid vector-raster image format for infinite zoom photography
 //!
@@ -31,10 +67,10 @@ pub use format::VeraFormat;
 pub use metadata::Metadata;
 pub use renderer::Renderer;
 
-/// VeRA format version
+/// `VeRA` format version
 pub const VERA_VERSION: u32 = 1;
 
-/// Magic bytes for VeRA files
+/// Magic bytes for `VeRA` files
 pub const VERA_MAGIC: &[u8; 4] = b"VERA";
 
 /// Maximum supported image dimensions

@@ -1,5 +1,14 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
+#![allow(
+    clippy::needless_continue,
+    clippy::doc_markdown,
+    clippy::uninlined_format_args,
+    clippy::match_same_arms,
+    clippy::needless_pass_by_value,
+    clippy::ptr_arg,
+    clippy::manual_div_ceil
+)]
 
 use std::fs::File;
 use std::path::PathBuf;

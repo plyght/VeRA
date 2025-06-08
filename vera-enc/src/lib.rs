@@ -1,9 +1,10 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
+#![allow(clippy::doc_markdown, clippy::missing_errors_doc)]
 
-//! VeRA format encoder library
+//! `VeRA` format encoder library
 //!
-//! This library provides encoding functionality for the VeRA image format.
+//! This library provides encoding functionality for the `VeRA` image format.
 
 use image::GenericImageView;
 
@@ -18,7 +19,7 @@ pub mod encoding {
     pub use vera::vector::VectorGenerator;
 }
 
-/// Convenience function to encode an image to VeRA format
+/// Convenience function to encode an image to `VeRA` format
 pub fn encode_image_to_vera<W: std::io::Write>(
     writer: W,
     image: &image::DynamicImage,

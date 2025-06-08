@@ -34,7 +34,7 @@ impl Renderer {
 
     /// Create a new renderer with GPU backend
     #[cfg(feature = "gpu")]
-    pub async fn new_gpu() -> Result<Self> {
+    pub fn new_gpu() -> Result<Self> {
         // TODO: Implement GPU rendering with correct wgpu API
         // For now, fall back to CPU rendering
         Err(VeraError::GpuError(

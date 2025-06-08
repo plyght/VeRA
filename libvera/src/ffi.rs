@@ -2,10 +2,10 @@
 
 use std::cell::RefCell;
 use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_int, c_uint};
+use std::os::raw::{c_char, c_uint};
 use std::ptr;
 
-use crate::{Decoder, Result, VeraError};
+use crate::{Decoder, VeraError};
 
 thread_local! {
     static LAST_ERROR: RefCell<Option<CString>> = RefCell::new(None);
@@ -85,7 +85,7 @@ pub extern "C" fn vera_decoder_open(path: *const c_char) -> *mut VeraDecoder {
     let file = match std::fs::File::open(path_str) {
         Ok(f) => f,
         Err(e) => {
-            let vera_error = VeraError::IoError(e.to_string());
+            let vera_error = VeraError::IoError(e);
             set_last_error(&vera_error);
             return ptr::null_mut();
         }
@@ -113,7 +113,7 @@ pub extern "C" fn vera_decoder_dimensions(
         return VeraErrorCode::UnknownError;
     }
 
-    let decoder = unsafe { &mut *(decoder as *mut Decoder<std::fs::File>) };
+    let decoder = unsafe { &mut *decoder.cast::<Decoder<std::fs::File>>() };
 
     match decoder.dimensions() {
         Ok((w, h)) => {
@@ -144,13 +144,14 @@ pub extern "C" fn vera_decoder_decode_tile(
         return VeraErrorCode::UnknownError;
     }
 
-    let decoder = unsafe { &mut *(decoder as *mut Decoder<std::fs::File>) };
+    let decoder = unsafe { &mut *decoder.cast::<Decoder<std::fs::File>>() };
 
     match decoder.decode_tile(level, x, y) {
         Ok(image) => {
             let pixels = image.as_raw();
             let required_size = pixels.len();
 
+            #[allow(clippy::cast_possible_truncation)]
             if output_size < required_size as c_uint {
                 return VeraErrorCode::UnknownError;
             }
@@ -168,12 +169,12 @@ pub extern "C" fn vera_decoder_decode_tile(
     }
 }
 
-/// Free a VeRA decoder
+/// Free a `VeRA` decoder
 #[no_mangle]
 pub extern "C" fn vera_decoder_free(decoder: *mut VeraDecoder) {
     if !decoder.is_null() {
         unsafe {
-            let _ = Box::from_raw(decoder as *mut Decoder<std::fs::File>);
+            let _ = Box::from_raw(decoder.cast::<Decoder<std::fs::File>>());
         }
     }
 }
@@ -181,8 +182,10 @@ pub extern "C" fn vera_decoder_free(decoder: *mut VeraDecoder) {
 /// Get last error message
 #[no_mangle]
 pub extern "C" fn vera_get_error_message() -> *const c_char {
-    LAST_ERROR.with(|e| match e.borrow().as_ref() {
-        Some(error_string) => error_string.as_ptr(),
-        None => b"No error information available\0".as_ptr() as *const c_char,
+    LAST_ERROR.with(|e| {
+        e.borrow().as_ref().map_or_else(
+            || c"No error information available".as_ptr(),
+            |error_string| error_string.as_ptr(),
+        )
     })
 }
