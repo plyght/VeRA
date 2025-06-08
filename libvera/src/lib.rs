@@ -54,6 +54,20 @@ pub mod renderer;
 pub mod tiles;
 pub mod vector;
 
+#[cfg(feature = "ml")]
+pub mod ml_segmentation;
+
+#[cfg(feature = "gpu")]
+pub mod gpu_shaders;
+
+#[cfg(feature = "streaming")]
+pub mod streaming;
+
+#[cfg(feature = "plugins")]
+pub mod plugins;
+
+pub mod performance;
+
 #[cfg(feature = "wasm")]
 pub mod wasm;
 

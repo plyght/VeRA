@@ -39,14 +39,45 @@ serde_json.workspace = true
 # Graphics rendering
 wgpu = { workspace = true, optional = true }
 bytemuck = { workspace = true, optional = true }
+lyon_tessellation = { workspace = true, optional = true }
+resvg = { workspace = true, optional = true }
+
+# ML and Computer Vision
+ort = { workspace = true, optional = true }
+ndarray = { workspace = true, optional = true }
+candle-core = { workspace = true, optional = true }
+candle-nn = { workspace = true, optional = true }
+candle-onnx = { workspace = true, optional = true }
+opencv = { workspace = true, optional = true }
+
+# Async and Streaming
+tokio = { workspace = true, optional = true }
+futures = { workspace = true, optional = true }
+futures-channel = { workspace = true, optional = true }
+async-stream = { workspace = true, optional = true }
+pin-project = { workspace = true, optional = true }
+
+# Performance and SIMD
+rayon = { workspace = true, optional = true }
+wide = { workspace = true, optional = true }
+simba = { workspace = true, optional = true }
+num_cpus = { workspace = true, optional = true }
+
+# Plugin system
+libloading = { workspace = true, optional = true }
+inventory = { workspace = true, optional = true }
 
 # FFI and WASM
 wasm-bindgen = { workspace = true, optional = true }
 js-sys = { workspace = true, optional = true }
 
 [features]
-default = ["gpu"]
-gpu = ["wgpu", "bytemuck"]
+default = ["gpu", "streaming", "performance"]
+gpu = ["wgpu", "bytemuck", "lyon_tessellation", "resvg", "futures-channel"]
+ml = ["ort", "ndarray", "candle-core", "candle-nn", "candle-onnx", "opencv"]
+streaming = ["tokio", "futures", "async-stream", "pin-project"]
+performance = ["rayon", "wide", "simba", "num_cpus"]
+plugins = ["libloading", "inventory"]
 wasm = ["wasm-bindgen", "js-sys"]
 ffi = []
 

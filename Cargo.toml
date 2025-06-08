@@ -49,6 +49,33 @@ toml = "0.8"
 # Graphics and rendering
 wgpu = "25.0"
 bytemuck = { version = "1.14", features = ["derive"] }
+lyon_tessellation = "1.0"
+resvg = "0.42"
+
+# ML and Computer Vision
+ort = "2.0.0-rc.10"
+ndarray = "0.15"
+candle-core = "0.6"
+candle-nn = "0.6"
+candle-onnx = "0.6"
+opencv = "0.92"
+
+# Async and Streaming
+tokio = { version = "1.0", features = ["full"] }
+futures = "0.3"
+futures-channel = "0.3"
+async-stream = "0.3"
+pin-project = "1.0"
+
+# Performance and SIMD
+rayon = "1.8"
+wide = "0.7"
+simba = "0.8"
+num_cpus = "1.16"
+
+# Plugin system
+libloading = "0.8"
+inventory = "0.3"
 
 # FFI and WASM
 wasm-bindgen = "0.2"

@@ -53,6 +53,21 @@ pub enum VeraError {
 
     #[error("Image format error: {0}")]
     ImageError(#[from] image::ImageError),
+
+    #[error("ML processing error: {0}")]
+    MlError(String),
+
+    #[error("Memory allocation error: {0}")]
+    MemoryError(String),
+
+    #[error("Performance measurement error: {0}")]
+    PerformanceError(String),
+
+    #[error("Plugin system error: {0}")]
+    PluginError(String),
+
+    #[error("Streaming operation error: {0}")]
+    StreamingError(String),
 }
 
 impl VeraError {
